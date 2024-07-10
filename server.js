@@ -30,12 +30,11 @@ const requestHandler = async (req, res) => {
 
 // Export the server handler for Vercel
 export default (req, res) => {
-  const server = createServer(requestHandler);
-  server.emit('request', req, res);
+  requestHandler(req, res);
 };
 
 // Start server locally if not in a serverless environment
-if (require.main === module) {
+if (process.env.NODE_ENV !== 'production') {
   createServer(requestHandler).listen(port, () => {
     console.log(`Server is running on port ${port}`);
   });
