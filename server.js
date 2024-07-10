@@ -13,10 +13,15 @@ const requestHandler = async (req, res) => {
     try {
       console.log(`Fetching app version for appId: ${appId}`);
       const app = await gplay.app({ appId });
-      const version = app.version;
-      console.log(`Fetched version ${version} for appId: ${appId}`);
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ appId, version }));
+
+      if (app && app.version) {
+        const version = app.version;
+        console.log(`Fetched version ${version} for appId: ${appId}`);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ appId, version }));
+      } else {
+        throw new Error('App details could not be fetched');
+      }
     } catch (error) {
       console.error(`Failed to get the app version for ${appId}:`, error);
       res.writeHead(500, { 'Content-Type': 'application/json' });

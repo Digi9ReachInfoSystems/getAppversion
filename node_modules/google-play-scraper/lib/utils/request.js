@@ -1,8 +1,8 @@
-import requestLib from 'got';
-import throttled from './throttle.js';
-import createDebug from 'debug';
+'use strict';
 
-const debug = createDebug('google-play-scraper');
+const debug = require('debug')('google-play-scraper');
+const requestLib = require('got');
+const throttled = require('./throttle.js');
 
 function doRequest (opts, limit) {
   let req;
@@ -10,7 +10,7 @@ function doRequest (opts, limit) {
     req = throttled(
       requestLib, {
         interval: 1000,
-        limit
+        limit: limit
       }
     );
   } else {
@@ -24,23 +24,24 @@ function doRequest (opts, limit) {
   });
 }
 
-async function request (opts, limit) {
+function request (opts, limit) {
   debug('Making request: %j', opts);
-  try {
-    const response = await doRequest(opts, limit);
-    debug('Request finished');
-    return response;
-  } catch (reason) {
-    debug('Request error:', reason.message, reason.response && reason.response.statusCode);
+  return doRequest(opts, limit)
+    .then(function (response) {
+      debug('Request finished');
+      return response;
+    })
+    .catch(function (reason) {
+      debug('Request error:', reason.message, reason.response && reason.response.statusCode);
 
-    let message = 'Error requesting Google Play:' + reason.message;
-    if (reason.response && reason.response.statusCode === 404) {
-      message = 'App not found (404)';
-    }
-    const err = Error(message);
-    err.status = reason.response && reason.response.statusCode;
-    throw err;
-  }
+      let message = 'Error requesting Google Play:' + reason.message;
+      if (reason.response && reason.response.statusCode === 404) {
+        message = 'App not found (404)';
+      }
+      const err = Error(message);
+      err.status = reason.response && reason.response.statusCode;
+      throw err;
+    });
 }
 
-export default request;
+module.exports = request;
