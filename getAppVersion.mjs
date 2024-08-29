@@ -17,7 +17,7 @@ async function getAppVersion(appId) {
 }
 
 // Replace 'com.digi9.edvt' with the actual app ID of the app you want to check
-const appId = 'com.digi9.edvt';
+let appId = process.env.APP_ID || 'com.digi9.edvt';
 
 // Get the app version
 getAppVersion(appId);
