@@ -1,35 +1,62 @@
 import { createServer } from 'http';
 import { parse } from 'url';
 import gplay from 'google-play-scraper';
+import store from 'app-store-scraper';
 
 const port = process.env.PORT || 3000;
+
+const getAppVersion = async (appId, platform) => {
+  if (!appId || typeof appId !== 'string') {
+    return { error: 'Invalid or missing appId' };
+  }
+
+  try {
+    if (platform === 'android') {
+      console.log(`[INFO] Fetching Android app version for appId: ${appId}`);
+      const app = await gplay.app({ appId });
+
+      if (app && app.version) {
+        return { appId, platform, version: app.version };
+      } else {
+        throw new Error('Android app details could not be fetched');
+      }
+    } else if (platform === 'ios') {
+      console.log(`[INFO] Fetching iOS app version for appId: ${appId}`);
+      const app = await store.app({ id: appId });
+
+      if (app && app.version) {
+        return { appId, platform, version: app.version };
+      } else {
+        throw new Error('iOS app details could not be fetched');
+      }
+    } else {
+      throw new Error('Invalid platform. Please specify either "android" or "ios".');
+    }
+  } catch (error) {
+    console.error(`[ERROR] Failed to get the app version for ${appId} on ${platform}:`, error.message);
+    return { error: error.message };
+  }
+};
 
 const requestHandler = async (req, res) => {
   const parsedUrl = parse(req.url, true);
   const path = parsedUrl.pathname;
   const appId = parsedUrl.query.appId;
+  const platform = parsedUrl.query.platform; // Expecting 'android' or 'ios'
 
-  if (path === '/app-version' && appId) {
-    try {
-      console.log(`Fetching app version for appId: ${appId}`);
-      const app = await gplay.app({ appId });
+  if (path === '/app-version' && appId && platform) {
+    const result = await getAppVersion(appId, platform);
 
-      if (app && app.version) {
-        const version = app.version;
-        console.log(`Fetched version ${version} for appId: ${appId}`);
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ appId, version }));
-      } else {
-        throw new Error('App details could not be fetched');
-      }
-    } catch (error) {
-      console.error(`Failed to get the app version for ${appId}:`, error);
+    if (result.error) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Failed to get the app version', details: error.message }));
+      res.end(JSON.stringify({ error: 'Failed to fetch app version', details: result.error }));
+    } else {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
     }
   } else {
     res.writeHead(404, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Not Found' }));
+    res.end(JSON.stringify({ error: 'Invalid request. Please provide appId and platform (android/ios).' }));
   }
 };
 
