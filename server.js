@@ -21,14 +21,17 @@ const getAppVersion = async (appId, platform) => {
         throw new Error('Android app details could not be fetched');
       }
     } else if (platform === 'ios') {
-      console.log(`[INFO] Fetching iOS app version for appId: ${appId}`);
-      const app = await store.app({ id: appId });
+      console.log(`[INFO] Searching iOS app by bundle ID: ${appId}`);
+      const results = await store.search({ term: appId, num: 1 });
 
-      if (app && app.version) {
-        return { appId, platform, version: app.version };
-      } else {
-        throw new Error('iOS app details could not be fetched');
+      if (results.length > 0) {
+        const app = results[0];
+        if (app && app.version) {
+          console.log(`[SUCCESS] Found iOS app: ${app.title}, Version: ${app.version}`);
+          return { appId: appId, platform, version: app.version };
+        }
       }
+      throw new Error('iOS app details could not be fetched');
     } else {
       throw new Error('Invalid platform. Please specify either "android" or "ios".');
     }
@@ -41,7 +44,7 @@ const getAppVersion = async (appId, platform) => {
 const requestHandler = async (req, res) => {
   const parsedUrl = parse(req.url, true);
   const path = parsedUrl.pathname;
-  const appId = parsedUrl.query.appId;
+  const appId = parsedUrl.query.appId; // For Android: applicationId, For iOS: bundleId
   const platform = parsedUrl.query.platform; // Expecting 'android' or 'ios'
 
   if (path === '/app-version' && appId && platform) {
