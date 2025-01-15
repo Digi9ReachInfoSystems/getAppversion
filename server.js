@@ -5,61 +5,56 @@ import store from 'app-store-scraper';
 
 const port = process.env.PORT || 3000;
 
-const getAppVersion = async (appId, platform) => {
-  if (!appId || typeof appId !== 'string') {
-    return { error: 'Invalid or missing appId' };
+const getAppVersions = async (bundleId) => {
+  if (!bundleId || typeof bundleId !== 'string') {
+    return { error: 'Invalid or missing bundleId' };
   }
 
+  const results = {};
+
+  // Fetch Android version
   try {
-    if (platform === 'android') {
-      console.log(`[INFO] Fetching Android app version for appId: ${appId}`);
-      const app = await gplay.app({ appId });
+    console.log(`[INFO] Fetching Android app version for bundleId: ${bundleId}`);
+    const androidApp = await gplay.app({ appId: bundleId });
+    results.androidVersion = androidApp.version;
+  } catch (error) {
+    console.error(`[ERROR] Failed to fetch Android app version for ${bundleId}:`, error.message);
+    results.androidVersionError = error.message;
+  }
 
-      if (app && app.version) {
-        return { appId, platform, version: app.version };
-      } else {
-        throw new Error('Android app details could not be fetched');
-      }
-    } else if (platform === 'ios') {
-      console.log(`[INFO] Searching iOS app by bundle ID: ${appId}`);
-      const results = await store.search({ term: appId, num: 1 });
-
-      if (results.length > 0) {
-        const app = results[0];
-        if (app && app.version) {
-          console.log(`[SUCCESS] Found iOS app: ${app.title}, Version: ${app.version}`);
-          return { appId: appId, platform, version: app.version };
-        }
-      }
-      throw new Error('iOS app details could not be fetched');
+  // Fetch iOS version
+  try {
+    console.log(`[INFO] Fetching iOS app version for bundleId: ${bundleId}`);
+    const iosResults = await store.search({ term: bundleId, num: 1 });
+    if (iosResults.length > 0) {
+      const iosApp = iosResults[0];
+      results.iosVersion = iosApp.version;
     } else {
-      throw new Error('Invalid platform. Please specify either "android" or "ios".');
+      throw new Error('No matching iOS app found');
     }
   } catch (error) {
-    console.error(`[ERROR] Failed to get the app version for ${appId} on ${platform}:`, error.message);
-    return { error: error.message };
+    console.error(`[ERROR] Failed to fetch iOS app version for ${bundleId}:`, error.message);
+    results.iosVersionError = error.message;
   }
+
+  return results;
 };
 
 const requestHandler = async (req, res) => {
   const parsedUrl = parse(req.url, true);
   const path = parsedUrl.pathname;
-  const appId = parsedUrl.query.appId; // For Android: applicationId, For iOS: bundleId
-  const platform = parsedUrl.query.platform; // Expecting 'android' or 'ios'
+  const bundleId = parsedUrl.query.bundleId;
 
-  if (path === '/app-version' && appId && platform) {
-    const result = await getAppVersion(appId, platform);
+  console.log(`[DEBUG] Request received: bundleId=${bundleId}`);
 
-    if (result.error) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Failed to fetch app version', details: result.error }));
-    } else {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(result));
-    }
+  if (path === '/app-versions' && bundleId) {
+    const versions = await getAppVersions(bundleId);
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ bundleId, ...versions }));
   } else {
     res.writeHead(404, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Invalid request. Please provide appId and platform (android/ios).' }));
+    res.end(JSON.stringify({ error: 'Invalid request. Please provide bundleId.' }));
   }
 };
 
