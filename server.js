@@ -1,47 +1,79 @@
 import { createServer } from 'http';
 import { parse } from 'url';
-import gplay from 'google-play-scraper';
+import { getIOSAppVersion } from './getIOSAppVersion.js'; // Import iOS version function
+import gplay from 'google-play-scraper'; // Import Google Play scraper
 
 const port = process.env.PORT || 3000;
 
+// Request handler function
 const requestHandler = async (req, res) => {
-  const parsedUrl = parse(req.url, true);
-  const path = parsedUrl.pathname;
-  const appId = parsedUrl.query.appId;
+    const parsedUrl = parse(req.url, true); // Parse the incoming URL
+    const path = parsedUrl.pathname;
+    const { appId, platform } = parsedUrl.query; // Extract query parameters
 
-  if (path === '/app-version' && appId) {
-    try {
-      console.log(`Fetching app version for appId: ${appId}`);
-      const app = await gplay.app({ appId });
+    // Check if the request is for the /app-version endpoint
+    if (path === '/app-version') {
+        // Validate query parameters
+        if (!appId || !platform) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            return res.end(
+                JSON.stringify({
+                    error: 'Missing required query parameters: appId and platform',
+                })
+            );
+        }
 
-      if (app && app.version) {
-        const version = app.version;
-        console.log(`Fetched version ${version} for appId: ${appId}`);
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ appId, version }));
-      } else {
-        throw new Error('App details could not be fetched');
-      }
-    } catch (error) {
-      console.error(`Failed to get the app version for ${appId}:`, error);
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Failed to get the app version', details: error.message }));
+        try {
+            let version;
+
+            if (platform === 'ios') {
+                // Fetch version from iOS App Store
+                version = await getIOSAppVersion(appId);
+            } else if (platform === 'android') {
+                // Fetch version from Google Play Store
+                const app = await gplay.app({ appId });
+                version = app.version;
+            } else {
+                // Unsupported platform
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                return res.end(
+                    JSON.stringify({
+                        error: 'Invalid platform. Supported values are "ios" or "android".',
+                    })
+                );
+            }
+
+            // Respond with the app version
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            return res.end(
+                JSON.stringify({
+                    appId,
+                    platform,
+                    version,
+                })
+            );
+        } catch (error) {
+            console.error(`Error fetching app version for appId: ${appId}`, error);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            return res.end(
+                JSON.stringify({
+                    error: 'Failed to fetch app version',
+                    details: error.message,
+                })
+            );
+        }
     }
-  } else {
+
+    // Handle other routes
     res.writeHead(404, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Not Found' }));
-  }
+    res.end(
+        JSON.stringify({
+            error: 'Not Found',
+        })
+    );
 };
 
-// Export the server handler for Vercel
-export default (req, res) => {
-  requestHandler(req, res);
-};
-
-// Start server locally if not in a serverless environment
-if (process.env.NODE_ENV !== 'production') {
-  createServer(requestHandler).listen(port, () => {
+// Start the server
+createServer(requestHandler).listen(port, () => {
     console.log(`Server is running on port ${port}`);
-  });
-}
-
+});

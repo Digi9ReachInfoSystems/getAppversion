@@ -7,7 +7,13 @@
   },
   "dependencies": {
     "app-store-scraper": "^0.18.0",
+    "axios": "^1.7.9",
     "google-play-scraper": "^10.0.1"
   },
-  "type": "module"
+  "type": "module",
+  "devDependencies": {},
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": ""
 }
